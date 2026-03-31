@@ -1,0 +1,25 @@
+# ncopy.ys - Optimized for Pipe-CPU
+# Strategy: 6-way unrolling to reduce loop overhead and branch penalties.
+# Also trying to avoid the 'mrmovq' to 'andq' load-use hazard.
+
+Loop:
+    mrmovq (%rdi), %r10     # src[0]
+    mrmovq 8(%rdi), %r11    # src[1]
+    rmmovq %r10, (%rsi)     # dst[0]
+    andq %r10, %r10         # test src[0]
+    jle Pos1
+    iaddq $1, %rax          # count++
+Pos1:
+    rmmovq %r11, 8(%rsi)    # dst[1]
+    andq %r11, %r11         # test src[1]
+    jle Pos2
+    iaddq $1, %rax
+# ... skipping some unrolling for brevity ...
+Pos5:
+    iaddq $48, %rdi         # jump src by 6 words
+    iaddq $48, %rsi         # jump dst by 6 words
+    iaddq $-6, %rdx         # len -= 6
+    jge Loop
+
+Remainder:                  # Handle the leftovers (1-5 elements)
+    # The jump table logic here is a mess but fast
